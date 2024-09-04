@@ -1,74 +1,85 @@
 #include <iostream>
-#include <string>
 #include <sstream>
+#include <string>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 #include <arpa/inet.h>
+#include <cstring>
+
+// function declarations
+int createServerSocket(int port);
+void handleClient(int clientSocket);
+void sendResponse(int clientSocket);
 
 int main() {
-    int serverFileDescriptor, clientSocket;
-    struct sockaddr_in serverAddress;
-    int option = 1;
-    int addressLength = sizeof(serverAddress);
-
-    const int PORT = 3500;
-    char buffer[1024] = {0};
-
-    if ((serverFileDescriptor = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
-        perror("Socket Creation Failed");
-        exit(EXIT_FAILURE);
+    int serverSocket = createServerSocket(3050);
+    if (serverSocket < 0){ //while exists
+        std::cerr << "main server socket creation failed";
+        return 1;
     }
-
-    // Forcefully attach to port
-    if (setsockopt(serverFileDescriptor, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option))) {
-        perror("Setsockopt failed");
-        close(serverFileDescriptor);
-        exit(EXIT_FAILURE);
-    }
-
-    serverAddress.sin_family = AF_INET;
-    serverAddress.sin_addr.s_addr = INADDR_ANY;
-    serverAddress.sin_port = htons(PORT);
-
-    // Binding the socket to the port
-    if (bind(serverFileDescriptor, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) < 0) {
-        perror("Bind failed");
-        close(serverFileDescriptor);
-        exit(EXIT_FAILURE);
-    }
-
-    // Listening for incoming connections
-    if (listen(serverFileDescriptor, 3) < 0) {
-        perror("Listen failed");
-        close(serverFileDescriptor);
-        exit(EXIT_FAILURE);
-    }
-
-    std::cout << "Server is listening on port " << PORT << std::endl;
-
+    // create client socket
     while (true) {
-        if ((clientSocket = accept(serverFileDescriptor, (struct sockaddr *)&serverAddress, (socklen_t*)&addressLength)) < 0) {
-            perror("Accept failed");
-            close(serverFileDescriptor);
-            exit(EXIT_FAILURE);
+        struct sockaddr_in clientAddr;
+        socklen_t clientLen = sizeof(clientAddr);
+        int clientSocket = accept(serverSocket, (struct sockaddr*)&clientAddr, &clientLen);
+
+        if (clientSocket < 0){
+            std::cerr << "failed to accept connetion\n";
+            continue;
         }
-
-        read(clientSocket, buffer, 1024);
-        
-        // Simple HTTP response
-        std::ostringstream responseStream;
-        std::string body = "The HTTP Server is alive!!\r\nHello, world!";
-        responseStream << "HTTP/1.1 200 OK\r\n";
-        responseStream << "Content-Type: text/html\r\n";
-        responseStream << "Content-Length: " << body.length() << "\r\n";
-        responseStream << "\r\n";
-        responseStream << body;
-
-        std::string response = responseStream.str();
-        send(clientSocket, response.c_str(), response.length(), 0);
-
+        handleClient(clientSocket);
         close(clientSocket);
     }
 
-    close(serverFileDescriptor);
+    close(serverSocket);
     return 0;
+}
+
+
+int createServerSocket(int port) {
+    int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (serverSocket < 0){ //while exists
+        std::cerr << "socket creation failed";
+        return 1;
+    }
+
+    struct sockaddr_in serverAddr;
+    std::memset(&serverAddr, 0, sizeof(serverAddr)); //allocate memory
+    // what is sin_ and/or sockaddr_in methods
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_addr.s_addr = INADDR_ANY;
+    serverAddr.sin_port = htons(port);
+
+    // fill this
+    if (bind(serverSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) < 0) {
+        std::cerr << "Binding failed\n";
+        close(serverSocket);
+        return -1;
+    }
+
+    if (listen(serverSocket, 5) < 0) {
+        std::cerr << "Listening failed\n";
+        close(serverSocket);
+        return -1;
+    }
+
+    return serverSocket;
+}
+
+void handleClient(int clientSocket) {
+    sendResponse(clientSocket);
+}
+
+void sendResponse(int clientSocket) {
+    std::ostringstream responseStream;
+    responseStream << "HTTP/1.1 200 OK\r\n";
+    responseStream << "Content-Type: text/html\r\n";
+    responseStream << "Content-Length: 13\r\n";
+    responseStream << "\r\n";
+    responseStream << "Hello, world!";
+
+    std::string response = responseStream.str();
+    send(clientSocket, response.c_str(), response.length(), 0);
 }
