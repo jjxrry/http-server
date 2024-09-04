@@ -18,7 +18,7 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    // forcefully attach to port
+    // Forcefully attach to port
     if (setsockopt(serverFileDescriptor, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option))) {
         perror("Setsockopt failed");
         close(serverFileDescriptor);
@@ -29,7 +29,7 @@ int main() {
     serverAddress.sin_addr.s_addr = INADDR_ANY;
     serverAddress.sin_port = htons(PORT);
 
-        // Binding the socket to the port
+    // Binding the socket to the port
     if (bind(serverFileDescriptor, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) < 0) {
         perror("Bind failed");
         close(serverFileDescriptor);
