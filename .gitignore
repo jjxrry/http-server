@@ -1,4 +1,6 @@
 .DS_Store
 .vscode
 /build
-build_script.sh
+build-script.sh
+build-debug.sh
+build-release.sh
